@@ -51,7 +51,7 @@ def init_db():  # Keep as sync for initialization
 init_db()
 
 @mcp.tool()
-async def add_expense(date, amount, category, subcategory="", note=""):  # Changed: added async
+async def add_expense(date: str, amount: float, category: str, subcategory: str = "", note: str = ""):  # Changed: added type hints
     '''Add a new expense entry to the database.'''
     try:
         async with aiosqlite.connect(DB_PATH) as c:  # Changed: added async
@@ -68,7 +68,7 @@ async def add_expense(date, amount, category, subcategory="", note=""):  # Chang
         return {"status": "error", "message": f"Database error: {str(e)}"}
     
 @mcp.tool()
-async def list_expenses(start_date, end_date):  # Changed: added async
+async def list_expenses(start_date: str, end_date: str):  # Changed: added type hints
     '''List expense entries within an inclusive date range.'''
     try:
         async with aiosqlite.connect(DB_PATH) as c:  # Changed: added async
@@ -87,7 +87,7 @@ async def list_expenses(start_date, end_date):  # Changed: added async
         return {"status": "error", "message": f"Error listing expenses: {str(e)}"}
 
 @mcp.tool()
-async def summarize(start_date, end_date, category=None):  # Changed: added async
+async def summarize(start_date: str, end_date: str, category: str = None):  # Changed: added type hints
     '''Summarize expenses by category within an inclusive date range.'''
     try:
         async with aiosqlite.connect(DB_PATH) as c:  # Changed: added async
@@ -109,6 +109,22 @@ async def summarize(start_date, end_date, category=None):  # Changed: added asyn
             return [dict(zip(cols, r)) for r in await cur.fetchall()]  # Changed: added await
     except Exception as e:
         return {"status": "error", "message": f"Error summarizing expenses: {str(e)}"}
+
+@mcp.tool()
+async def get_categories() -> list:
+    '''Get the list of valid predefined categories for expenses.'''
+    return [
+        "Food & Dining",
+        "Transportation",
+        "Shopping",
+        "Entertainment",
+        "Bills & Utilities",
+        "Healthcare",
+        "Travel",
+        "Education",
+        "Business",
+        "Other"
+    ]
 
 @mcp.resource("expense:///categories", mime_type="application/json")  # Changed: expense:// → expense:///
 def categories():

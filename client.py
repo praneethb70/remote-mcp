@@ -86,6 +86,13 @@ if "initialized" not in st.session_state:
         st.session_state.tools = tools
         st.session_state.tool_by_name = {t.name: t for t in tools}
 
+        # Dynamically inject categories into SYSTEM_PROMPT to avoid implicit LLM lookup failures
+        if "get_categories" in st.session_state.tool_by_name:
+            categories_res = asyncio.run(st.session_state.tool_by_name["get_categories"].ainvoke({}))
+            dynamic_prompt = SYSTEM_PROMPT + f"\n\nVALID CATEGORIES RESOURCE (YOU MUST CHOOSE FROM THESE EXACT STRINGS): {categories_res}"
+        else:
+            dynamic_prompt = SYSTEM_PROMPT
+
         # 3) Bind tools
         st.session_state.llm_with_tools = st.session_state.llm.bind_tools(tools)
     except Exception as e:
@@ -93,9 +100,10 @@ if "initialized" not in st.session_state:
         st.info("Make sure your MCP_API_KEY is correct or the server is running.")
         st.session_state.tools = []
         st.session_state.llm_with_tools = st.session_state.llm
+        dynamic_prompt = SYSTEM_PROMPT
 
     # 4) Conversation state
-    st.session_state.history = [SystemMessage(content=SYSTEM_PROMPT)]
+    st.session_state.history = [SystemMessage(content=dynamic_prompt)]
     st.session_state.initialized = True
 
 # Render chat history (skip system + tool messages; hide intermediate AI with tool_calls)
