@@ -5,8 +5,19 @@ import aiosqlite
 import tempfile
 # Use temporary directory which should be writable
 TEMP_DIR = tempfile.gettempdir()
-DB_PATH = os.path.join(os.path.dirname(__file__), "expenses.db")
-CATEGORIES_PATH = os.path.join(os.path.dirname(__file__), "categories.json")
+
+# Determine a writable directory for our data
+base_dir = os.path.dirname(__file__)
+try:
+    test_path = os.path.join(base_dir, ".test_write")
+    with open(test_path, "w") as f:
+        f.write("test")
+    os.remove(test_path)
+    DATA_DIR = base_dir
+except (OSError, IOError):
+    DATA_DIR = TEMP_DIR
+
+DB_PATH = os.getenv("DB_PATH", os.path.join(DATA_DIR, "expenses.db"))
 
 print(f"Database path: {DB_PATH}")
 
@@ -101,33 +112,29 @@ async def summarize(start_date, end_date, category=None):  # Changed: added asyn
 
 @mcp.resource("expense:///categories", mime_type="application/json")  # Changed: expense:// → expense:///
 def categories():
-    try:
-        # Provide default categories if file doesn't exist
-        default_categories = {
-            "categories": [
-                "Food & Dining",
-                "Transportation",
-                "Shopping",
-                "Entertainment",
-                "Bills & Utilities",
-                "Healthcare",
-                "Travel",
-                "Education",
-                "Business",
-                "Other"
-            ]
-        }
-        
-        try:
-            with open(CATEGORIES_PATH, "r", encoding="utf-8") as f:
-                return f.read()
-        except FileNotFoundError:
-            import json
-            return json.dumps(default_categories, indent=2)
-    except Exception as e:
-        return f'{{"error": "Could not load categories: {str(e)}"}}'
+    import json
+    # Provide default categories
+    default_categories = {
+        "categories": [
+            "Food & Dining",
+            "Transportation",
+            "Shopping",
+            "Entertainment",
+            "Bills & Utilities",
+            "Healthcare",
+            "Travel",
+            "Education",
+            "Business",
+            "Other"
+        ]
+    }
+    return json.dumps(default_categories, indent=2)
 
 # Start the server
 if __name__ == "__main__":
-    mcp.run(transport="http", host="0.0.0.0", port=8000)
-    # mcp.run()
+    # When running directly use a configurable port (default 8000)
+    # The MCP Inspector will import the mcp object directly and start its own server
+    import sys
+    # Don't run the server if we're just checking syntax or being imported by fastmcp CLI
+    if not any(arg.endswith('fastmcp') for arg in sys.argv):
+        mcp.run(transport="stdio") # Typical for local use, but can use sse if needed

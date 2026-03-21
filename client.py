@@ -25,9 +25,18 @@ SERVERS = {
     #    ]
     # },
     "expense": {
-        "transport": "sse",
-        "url": "http://localhost:8000/mcp"
+        "transport": "streamable_http",
+        "url": "https://deafening-silver-slug.fastmcp.app/mcp"
     }
+    # "expense": {
+    #     "transport": "stdio",
+    #     "command": "uv",
+    #     "args": [
+    #         "run",
+    #         "main.py"
+    #     ]
+    # }
+
     # "manim-server": {
     #     "transport": "stdio",
     #     "command": "/Library/Frameworks/Python.framework/Versions/3.11/bin/python3",
@@ -41,7 +50,11 @@ SERVERS = {
 }
 
 
+import datetime
+
 SYSTEM_PROMPT = (
+    f"You are a helpful assistant who helps plan my expenses. Today's date is {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}. "
+    "Use this information to interpret relative dates like 'today', 'yesterday', or 'last week'. "
     "You have access to tools. When you choose to call a tool, do not narrate status updates. "
     "After tools run, return only a concise final answer."
 )
@@ -57,13 +70,29 @@ if "initialized" not in st.session_state:
     st.session_state.llm = ChatGroq(model="qwen/qwen3-32b",api_key=os.getenv("GROQ_API_KEY"))
 
     # 2) MCP tools
-    st.session_state.client = MultiServerMCPClient(SERVERS)
-    tools = asyncio.run(st.session_state.client.get_tools())
-    st.session_state.tools = tools
-    st.session_state.tool_by_name = {t.name: t for t in tools}
+    headers = {}
+    mcp_token = os.getenv("MCP_API_KEY")
+    if mcp_token:
+        headers["Authorization"] = f"Bearer {mcp_token}"
+    
+    # Update SERVERS with headers if needed
+    for server_name in SERVERS:
+        if mcp_token and SERVERS[server_name].get("transport") != "stdio":
+            SERVERS[server_name]["headers"] = headers
 
-    # 3) Bind tools
-    st.session_state.llm_with_tools = st.session_state.llm.bind_tools(tools)
+    try:
+        st.session_state.client = MultiServerMCPClient(SERVERS)
+        tools = asyncio.run(st.session_state.client.get_tools())
+        st.session_state.tools = tools
+        st.session_state.tool_by_name = {t.name: t for t in tools}
+
+        # 3) Bind tools
+        st.session_state.llm_with_tools = st.session_state.llm.bind_tools(tools)
+    except Exception as e:
+        st.error(f"Failed to connect to MCP server: {e}")
+        st.info("Make sure your MCP_API_KEY is correct or the server is running.")
+        st.session_state.tools = []
+        st.session_state.llm_with_tools = st.session_state.llm
 
     # 4) Conversation state
     st.session_state.history = [SystemMessage(content=SYSTEM_PROMPT)]
